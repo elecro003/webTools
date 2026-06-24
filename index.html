@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>글자 수 및 바이트 수 계산기</title>
+  <style>
+    /* 기본 여백과 박스 크기 계산 방식을 정리합니다. */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      color: #191f28;
+      background: #f1f3f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: min(100%, 760px);
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.08);
+      padding: 42px;
+    }
+
+    .title {
+      margin: 0 0 10px;
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .description {
+      margin: 0 0 30px;
+      color: #6b7684;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    .text-input {
+      width: 100%;
+      min-height: 220px;
+      resize: none;
+      border: 1px solid #e5e8eb;
+      border-radius: 18px;
+      background: #fafafb;
+      color: #191f28;
+      font: inherit;
+      font-size: 17px;
+      line-height: 1.7;
+      padding: 20px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .text-input::placeholder {
+      color: #9aa4b2;
+    }
+
+    .text-input:focus {
+      border-color: #3182f6;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.12);
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .result-card {
+      min-height: 118px;
+      border-radius: 18px;
+      background: #f9fafb;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .result-label {
+      color: #6b7684;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .result-value {
+      color: #3182f6;
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0;
+      word-break: break-all;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        align-items: flex-start;
+        padding: 20px 14px;
+      }
+
+      .container {
+        padding: 28px 20px;
+        border-radius: 22px;
+      }
+
+      .title {
+        font-size: 26px;
+      }
+
+      .description {
+        font-size: 15px;
+      }
+
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .result-card {
+        min-height: 104px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1 class="title">글자 수 및 바이트 수 계산기</h1>
+    <p class="description">입력한 내용의 글자 수와 EUC-KR 기준 바이트 수를 실시간으로 확인하세요.</p>
+
+    <textarea
+      id="textInput"
+      class="text-input"
+      placeholder="여기에 문장을 입력하거나 붙여넣어 주세요."
+      aria-label="글자 수와 바이트 수를 계산할 텍스트 입력"
+    ></textarea>
+
+    <section class="result-grid" aria-label="계산 결과">
+      <article class="result-card">
+        <span class="result-label">공백 포함 글자 수</span>
+        <strong id="charWithSpaces" class="result-value">0</strong>
+      </article>
+
+      <article class="result-card">
+        <span class="result-label">공백 제외 글자 수</span>
+        <strong id="charWithoutSpaces" class="result-value">0</strong>
+      </article>
+
+      <article class="result-card">
+        <span class="result-label">총 바이트 수</span>
+        <strong id="totalBytes" class="result-value">0</strong>
+      </article>
+
+      <article class="result-card">
+        <span class="result-label">계산 기준</span>
+        <strong class="result-value">EUC-KR</strong>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    // 필요한 HTML 요소를 JavaScript에서 사용할 수 있도록 가져옵니다.
+    const textInput = document.getElementById("textInput");
+    const charWithSpaces = document.getElementById("charWithSpaces");
+    const charWithoutSpaces = document.getElementById("charWithoutSpaces");
+    const totalBytes = document.getElementById("totalBytes");
+
+    // EUC-KR 이력서 기준에 맞춰 바이트 수를 계산합니다.
+    function calculateEucKrBytes(text) {
+      let bytes = 0;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const code = char.charCodeAt(0);
+
+        // Windows 줄바꿈(\r\n)은 하나의 줄바꿈으로 보고 2바이트만 더합니다.
+        if (char === "\r") {
+          continue;
+        }
+
+        // 줄바꿈은 사람인, 잡코리아 기준처럼 2바이트로 계산합니다.
+        if (char === "\n") {
+          bytes += 2;
+          continue;
+        }
+
+        // 한글 완성형과 한글 자모는 2바이트로 계산합니다.
+        if (
+          (code >= 0xac00 && code <= 0xd7a3) ||
+          (code >= 0x3131 && code <= 0x318e)
+        ) {
+          bytes += 2;
+          continue;
+        }
+
+        // 영문, 숫자, 공백, 일반 특수문자는 1바이트로 계산합니다.
+        bytes += 1;
+      }
+
+      return bytes;
+    }
+
+    // 입력값이 바뀔 때마다 화면의 숫자를 새로 계산해 표시합니다.
+    function updateResults() {
+      const text = textInput.value;
+      const textWithoutSpaces = text.replace(/\s/g, "");
+
+      charWithSpaces.textContent = text.length.toLocaleString("ko-KR");
+      charWithoutSpaces.textContent = textWithoutSpaces.length.toLocaleString("ko-KR");
+      totalBytes.textContent = calculateEucKrBytes(text).toLocaleString("ko-KR");
+    }
+
+    // input 이벤트는 키보드 입력, 붙여넣기, 삭제 등 대부분의 변경을 즉시 감지합니다.
+    textInput.addEventListener("input", updateResults);
+  </script>
+</body>
+</html>
